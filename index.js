@@ -1,4 +1,3 @@
-// server/index.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -41,12 +40,17 @@ io.on('connection', (socket) => {
   socket.on('joinLobby', ({ lobbyId, playerName }) => {
     const lobby = lobbies.get(lobbyId);
     if (!lobby || lobby.players.length >= lobby.maxPlayers || lobby.state === 'playing') {
-      socket.emit('joinError', 'Лобби заполнено');
+      socket.emit('joinError', 'Лобби заполнено или игра идет');
       return;
     }
+    
     lobby.players.push({ id: socket.id, name: playerName });
     socket.join(lobbyId);
     socket.lobbyId = lobbyId;
+    
+    // ФИКС №1: Гарантированная отправка данных второму игроку, чтобы он построил карту!
+    socket.emit('joinedLobby', lobby); 
+    
     io.to(lobbyId).emit('lobbyUpdated', lobby);
 
     if (lobby.players.length === lobby.maxPlayers) {
@@ -56,7 +60,6 @@ io.on('connection', (socket) => {
     io.emit('lobbyListUpdate', getLobbyList());
   });
 
-  // НОВАЯ СИНХРОНИЗАЦИЯ
   socket.on('syncClient', (data) => {
     const lobbyId = socket.lobbyId;
     if (lobbyId && lobbies.has(lobbyId)) {
