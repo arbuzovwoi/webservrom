@@ -19,8 +19,6 @@ function getLobbyList() {
 }
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
   socket.on('createLobby', (data) => {
     const lobbyId = socket.id + Date.now().toString(36);
     const lobby = {
@@ -43,17 +41,14 @@ io.on('connection', (socket) => {
   socket.on('joinLobby', ({ lobbyId, playerName }) => {
     const lobby = lobbies.get(lobbyId);
     if (!lobby || lobby.players.length >= lobby.maxPlayers || lobby.state === 'playing') {
-      socket.emit('joinError', 'Лобби заполнено или игра уже идет');
+      socket.emit('joinError', 'Лобби заполнено');
       return;
     }
     lobby.players.push({ id: socket.id, name: playerName });
     socket.join(lobbyId);
     socket.lobbyId = lobbyId;
-    
-    // Оповещаем всех в лобби, что состав изменился
     io.to(lobbyId).emit('lobbyUpdated', lobby);
 
-    // Если лобби заполнено, начинаем игру
     if (lobby.players.length === lobby.maxPlayers) {
       lobby.state = 'playing';
       io.to(lobbyId).emit('gameStart', lobby);
@@ -61,7 +56,7 @@ io.on('connection', (socket) => {
     io.emit('lobbyListUpdate', getLobbyList());
   });
 
-  // Универсальная синхронизация состояния игроков (позиция, анимации, скины, HP)
+  // НОВАЯ СИНХРОНИЗАЦИЯ
   socket.on('syncClient', (data) => {
     const lobbyId = socket.lobbyId;
     if (lobbyId && lobbies.has(lobbyId)) {
@@ -69,7 +64,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Синхронизация выстрелов
   socket.on('shoot', (data) => {
     const lobbyId = socket.lobbyId;
     if (lobbyId && lobbies.has(lobbyId)) {
@@ -82,7 +76,6 @@ io.on('connection', (socket) => {
     if (lobbyId && lobbies.has(lobbyId)) {
       const lobby = lobbies.get(lobbyId);
       lobby.players = lobby.players.filter(p => p.id !== socket.id);
-      
       if (lobby.players.length === 0) {
         lobbies.delete(lobbyId);
       } else {
