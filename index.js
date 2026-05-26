@@ -67,7 +67,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Синхронизация движения и состояния
   socket.on('syncClient', (data) => {
     socket.to(socket.lobbyId).emit('syncServer', { id: socket.id, ...data });
   });
@@ -76,27 +75,22 @@ io.on('connection', (socket) => {
     socket.to(socket.lobbyId).emit('enemyShoot', { id: socket.id, ...data });
   });
 
-  // Урон от пули
   socket.on('bulletHit', ({ targetId, damage }) => {
     socket.to(socket.lobbyId).emit('damageInflicted', { targetId, damage });
   });
 
-  // Удар кулаком
-  socket.on('meleeHit', ({ targetId, damage, isVamp }) => {
+  socket.on('meleeHit', ({ targetId, damage }) => {
     socket.to(socket.lobbyId).emit('meleeHitSync', { targetId, damage });
   });
 
-  // Окончание раунда
-  socket.on('roundEnd', ({ winner, score }) => {
-    socket.to(socket.lobbyId).emit('roundEndSync', { winner, score });
+  socket.on('roundEnd', ({ winner, score, roundNumber }) => {
+    socket.to(socket.lobbyId).emit('roundEndSync', { winner, score, roundNumber });
   });
 
-  // Синхронизация способностей
   socket.on('abilityUsed', (data) => {
     socket.to(socket.lobbyId).emit('abilitySync', { playerId: socket.id, ...data });
   });
 
-  // Синхронизация номера раунда
   socket.on('syncRound', ({ roundNumber }) => {
     socket.to(socket.lobbyId).emit('roundNumberSync', roundNumber);
   });
@@ -105,6 +99,27 @@ io.on('connection', (socket) => {
     const lobby = lobbies.get(lobbyId);
     if (lobby) {
       lobby.players = lobby.players.filter(p => p.id !== socket.id);
+      socket.leave(lobbyId);
+      if (lobby.players.length === 0) lobbies.delete(lobbyId);
+      else io.to(lobbyId).emit('lobbyUpdated', lobby);
+      io.emit('lobbyListUpdate', getLobbyList());
+    }
+    socket.lobbyId = null;
+  });
+
+  socket.on('disconnect', () => {
+    const lobby = lobbies.get(socket.lobbyId);
+    if (lobby) {
+      lobby.players = lobby.players.filter(p => p.id !== socket.id);
+      if (lobby.players.length === 0) lobbies.delete(socket.lobbyId);
+      else io.to(socket.lobbyId).emit('lobbyUpdated', lobby);
+      io.emit('lobbyListUpdate', getLobbyList());
+    }
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));      lobby.players = lobby.players.filter(p => p.id !== socket.id);
       socket.leave(lobbyId);
       if (lobby.players.length === 0) lobbies.delete(lobbyId);
       else io.to(lobbyId).emit('lobbyUpdated', lobby);
